@@ -23,19 +23,19 @@ namespace NETFrameworkPerfEx
 
             // Process records in parallel batches
             // Partition the DataTable
-            int partitionSize = 1000;
-            List<DataTable> partitions = PartitionDataTable(dataTable, partitionSize);
+            int numberOfPartitions = 10;
+            List<DataTable> partitions = PartitionDataTable(dataTable, numberOfPartitions);
 
             // Execute operations on each partition in parallel
-            Parallel.ForEach(partitions, partition =>
+            Parallel.ForEach(partitions, (partition, state, index) =>
             {
-                ProcessPartition(partition);
+                ProcessPartition(partition,index);
             });
 
             Console.Write("Processing complete.");
         }
 
-        static List<DataTable> PartitionDataTable(DataTable dt, int partitionSize)
+        static List<DataTable> PartitionDataTableFixedSize(DataTable dt, int partitionSize)
         {
             List<DataTable> partitions = new List<DataTable>();
             int totalRows = dt.Rows.Count;
@@ -60,20 +60,48 @@ namespace NETFrameworkPerfEx
             return partitions;
         }
 
-        static void ProcessPartition(DataTable partition)
+        static List<DataTable> PartitionDataTable(DataTable dt, int numberOfPartitions)
         {
-            // Example operation: Print the row count of the partition
-            Console.WriteLine("Processing partition with row count: " + partition.Rows.Count);
+            List<DataTable> partitions = new List<DataTable>();
+            int totalRows = dt.Rows.Count;
+            int partitionSize = (totalRows + numberOfPartitions - 1) / numberOfPartitions; // Ceiling division to ensure all rows are included
 
-            // Example operation: Update a column value
-            foreach (DataRow row in partition.Rows)
+            for (int i = 0; i < numberOfPartitions; i++)
             {
-                row["Name"] = row["Name"] + "_processed";
+                DataTable partition = dt.Clone(); // Clone the structure of the DataTable
+                int start = i * partitionSize;
+                int end = Math.Min(start + partitionSize, totalRows);
+
+                for (int j = start; j < end; j++)
+                {
+                    partition.ImportRow(dt.Rows[j]);
+                }
+
+                Console.WriteLine($"Partition {i + 1} created with {partition.Rows.Count} rows.");
+                partitions.Add(partition);
             }
 
-            // Simulate some processing time
-            System.Threading.Thread.Sleep(100); // For example, simulate some time-consuming processing
+            return partitions;
         }
+
+        static void ProcessPartition(DataTable partition, long partitionIndex)
+        {
+            Console.WriteLine($"Processing partition {partitionIndex + 1} with {partition.Rows.Count} rows.");
+
+            foreach (DataRow row in partition.Rows)
+            {
+                // Log the current record being processed
+                Console.WriteLine($"Partition {partitionIndex + 1}: Processing record Id={row["Id"]}");
+
+                // Example operation: Update a column value
+                row["Name"] = row["Name"] + "_processed";
+
+                // Simulate some processing time
+                System.Threading.Thread.Sleep(10); // For example, simulate some time-consuming processing
+            }
+
+            Console.WriteLine($"Finished processing partition {partitionIndex + 1}.");
+        }       
 
         public static DataTable GetRecordsToProcess()
         {
@@ -82,7 +110,7 @@ namespace NETFrameworkPerfEx
             dataTable.Columns.Add("Name", typeof(string));
 
             // Adding sample data
-            for (int i = 0; i < 2500; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 dataTable.Rows.Add(i, "Name" + i);
             }

@@ -88,10 +88,12 @@ namespace NETFrameworkPerfEx
         {
             Console.WriteLine($"Processing partition {partitionIndex + 1} with {partition.Rows.Count} rows.");
 
-            foreach (DataRow row in partition.Rows)
+            for (int rowIndex = 0; rowIndex < partition.Rows.Count; rowIndex++)
             {
-                // Log the current record being processed
-                Console.WriteLine($"Partition {partitionIndex + 1}: Processing record Id={row["Id"]}");
+                DataRow row = partition.Rows[rowIndex];
+
+                // Log the current record being processed by its index in the partition
+                Console.WriteLine($"Partition {partitionIndex + 1}: Processing record {rowIndex + 1}/{partition.Rows.Count}");
 
                 // Example operation: Update a column value
                 row["Name"] = row["Name"] + "_processed";
@@ -101,7 +103,7 @@ namespace NETFrameworkPerfEx
             }
 
             Console.WriteLine($"Finished processing partition {partitionIndex + 1}.");
-        }       
+        }
 
         public static DataTable GetRecordsToProcess()
         {

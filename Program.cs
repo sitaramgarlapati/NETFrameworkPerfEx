@@ -20,60 +20,74 @@ namespace NETFrameworkPerfEx
         public static void ProcessRecordsInParallel()
         {
             DataTable dataTable = GetRecordsToProcess();
-            const int batchSize = 100; // Adjust batch size as necessary
 
             // Process records in parallel batches
-            Parallel.ForEach(PartitionDataTable(dataTable, batchSize), batch =>
+            // Partition the DataTable
+            int partitionSize = 1000;
+            List<DataTable> partitions = PartitionDataTable(dataTable, partitionSize);
+
+            // Execute operations on each partition in parallel
+            Parallel.ForEach(partitions, partition =>
             {
-                List<int> processedRecordIds = new List<int>();
-                foreach (DataRow row in batch)
+                ProcessPartition(partition);
+            });
+
+            Console.Write("Processing complete.");
+        }
+
+        static List<DataTable> PartitionDataTable(DataTable dt, int partitionSize)
+        {
+            List<DataTable> partitions = new List<DataTable>();
+            int totalRows = dt.Rows.Count;
+            int totalPartitions = (totalRows + partitionSize - 1) / partitionSize; // Ceiling division
+
+            Console.WriteLine("Number of Partitions: " + totalPartitions);
+
+            for (int i = 0; i < totalPartitions; i++)
+            {
+                DataTable partition = dt.Clone(); // Clone the structure of the DataTable
+                int start = i * partitionSize;
+                int end = Math.Min(start + partitionSize, totalRows);
+
+                for (int j = start; j < end; j++)
                 {
-                    ProcessRecord(row);
-                    processedRecordIds.Add(Convert.ToInt32(row["Id"]));
+                    partition.ImportRow(dt.Rows[j]);
                 }
 
-            });
-        }
-               
-        public static  IEnumerable<DataRow[]> PartitionDataTable(DataTable table, int batchSize)
-        {
-            for (int i = 0; i < table.Rows.Count; i += batchSize)
-            {
-                DataRow[] batch = new DataRow[Math.Min(batchSize, table.Rows.Count - i)];
-                table.Rows.CopyTo(batch, i);
-                yield return batch;
+                partitions.Add(partition);
             }
+
+            return partitions;
+        }
+
+        static void ProcessPartition(DataTable partition)
+        {
+            // Example operation: Print the row count of the partition
+            Console.WriteLine("Processing partition with row count: " + partition.Rows.Count);
+
+            // Example operation: Update a column value
+            foreach (DataRow row in partition.Rows)
+            {
+                row["Name"] = row["Name"] + "_processed";
+            }
+
+            // Simulate some processing time
+            System.Threading.Thread.Sleep(100); // For example, simulate some time-consuming processing
         }
 
         public static DataTable GetRecordsToProcess()
         {
             DataTable dataTable = new DataTable();
-            using (SqlConnection conn = new SqlConnection("YourConnectionString"))
+            dataTable.Columns.Add("Id", typeof(int));
+            dataTable.Columns.Add("Name", typeof(string));
+
+            // Adding sample data
+            for (int i = 0; i < 2500; i++)
             {
-                conn.Open();
-                using (SqlCommand cmd = new SqlCommand("SELECT Id, ... FROM YourTable WHERE Status = 'Pending'", conn))
-                {
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
-                    {
-                        adapter.Fill(dataTable);
-                    }
-                }
+                dataTable.Rows.Add(i, "Name" + i);
             }
             return dataTable;
         }
-
-        public static void ProcessRecord(DataRow row)
-        {
-            // Your processing logic here
-        }
-
-        public class Record
-        {
-            public int Id { get; set; }
-            // Add other properties as needed
-        }
-
-
 
     }
 }
